@@ -42,14 +42,14 @@ class InventoryManagementEnv():
         return states, cost, self.terminal
 
 
-def build_beer_game(player='wholesaler', demand_type='classic_beer_game'):
+def build_beer_game(player='wholesaler', demand_type='classic_beer_game', max_period=35):
 
     if demand_type == 'classic_beer_game':
         demand_gen = DemandGenerator('classic_beer_game')
     elif demand_type == 'deterministic_random':
-        demand_gen = DemandGenerator((8 + 2 * np.random.randn(35)).astype(int))
+        demand_gen = DemandGenerator((8 + 2 * np.random.randn(max_period)).astype(int))
     else:
-        demand_gen = DemandGenerator('normal', mean=8, sd=2, size=35)
+        demand_gen = DemandGenerator('normal', mean=8, sd=2, size=max_period)
 
     bs_32 = Base_Stock_Policy(32)
     bs_24 = Base_Stock_Policy(24)
@@ -72,6 +72,6 @@ def build_beer_game(player='wholesaler', demand_type='classic_beer_game'):
             Arc('retailer', 'demand_source', 0, 0)]
 
     scn = Supply_chain_network(nodes=nodes, arcs=arcs, player=player)
-    scn.max_period = 35
+    scn.max_period = max_period
 
     return InventoryManagementEnv(scn)
