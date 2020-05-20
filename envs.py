@@ -18,7 +18,7 @@ class InventoryManagementEnv():
         self.scn.before_action(self.period)
 
         states = self.scn.get_states(self.scn.player, self.period)
-        #         states['period'] = self.period
+        states['period'] = self.period
 
         return states
 
@@ -37,7 +37,7 @@ class InventoryManagementEnv():
             self.terminal = True
 
         states = self.scn.get_states(self.scn.player, self.period)
-        #         states['period'] = self.period
+        states['period'] = self.period
 
         return states, cost, self.terminal
 
