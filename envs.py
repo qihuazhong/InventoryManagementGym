@@ -1,10 +1,10 @@
 import numpy as np
 from demands import DemandGenerator
-from policies import Base_Stock_Policy
-from supplychain import Node, Arc, Supply_chain_network
+from policies import BaseStockPolicy
+from supplychain import Node, Arc, SupplyChainNetwork
 
 
-class InventoryManagementEnv():
+class InventoryManagementEnv:
 
     def __init__(self, supply_chain_network):
         self.scn = supply_chain_network
@@ -51,8 +51,8 @@ def build_beer_game(player='wholesaler', demand_type='classic_beer_game', max_pe
     else:
         demand_gen = DemandGenerator('normal', mean=8, sd=2, size=max_period)
 
-    bs_32 = Base_Stock_Policy(32)
-    bs_24 = Base_Stock_Policy(24)
+    bs_32 = BaseStockPolicy(32)
+    bs_24 = BaseStockPolicy(24)
 
     demand_source = Node(name='demand_source', demand_source=True, demands=demand_gen)
     retailer = Node(name='retailer', policy=bs_32, initial_previous_orders=[4, 4, 4, 4])
@@ -63,15 +63,15 @@ def build_beer_game(player='wholesaler', demand_type='classic_beer_game', max_pe
 
     nodes = [demand_source, retailer, wholesaler, distributor, manufacturer, supply_source]
 
-    arcs = [Arc('supply_source', 'manufacturer', 1, 2, initial_shipments=[(4, 1), (4, 2)], initial_SOs=[(4, 0, 1)]),
+    arcs = [Arc('supply_source', 'manufacturer', 1, 2, initial_shipments=[(4, 1), (4, 2)], initial_sales_orders=[(4, 0, 1)]),
             Arc('manufacturer', 'distributor', 2, 2, initial_shipments=[(4, 1), (4, 2)],
-                initial_SOs=[(4, 0, 1), (4, 0, 2)]),
+                initial_sales_orders=[(4, 0, 1), (4, 0, 2)]),
             Arc('distributor', 'wholesaler', 2, 2, initial_shipments=[(4, 1), (4, 2)],
-                initial_SOs=[(4, 0, 1), (4, 0, 2)]),
-            Arc('wholesaler', 'retailer', 2, 2, initial_shipments=[(4, 1), (4, 2)], initial_SOs=[(4, 0, 1), (4, 0, 2)]),
+                initial_sales_orders=[(4, 0, 1), (4, 0, 2)]),
+            Arc('wholesaler', 'retailer', 2, 2, initial_shipments=[(4, 1), (4, 2)], initial_sales_orders=[(4, 0, 1), (4, 0, 2)]),
             Arc('retailer', 'demand_source', 0, 0)]
 
-    scn = Supply_chain_network(nodes=nodes, arcs=arcs, player=player)
+    scn = SupplyChainNetwork(nodes=nodes, arcs=arcs, player=player)
     scn.max_period = max_period
 
     return InventoryManagementEnv(scn)
