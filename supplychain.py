@@ -3,7 +3,6 @@ from typing import List
 
 
 
-
 @dataclass
 class Order:
     order_quantity: float
@@ -447,44 +446,5 @@ class Supply_chain_network():
 
     
     
-class InventoryManagementEnv():
-    
-    def __init__(self, supply_chain_network):
-        self.scn = supply_chain_network
-        self.terminal = False
-        
 
-    def reset(self):
-        self.terminal = False
-        self.scn.reset()
-        self.period = 0
-        
-        self.scn.before_action(self.period)
-        
-        states = self.scn.get_states(self.scn.player, self.period)
-#         states['period'] = self.period
-        
-        return states
-        
-    
-    def step(self, quantity, verbose=True):
-        
-        
-        self.scn.player_action(self.period, quantity)
-        self.scn.after_action(self.period)
-
-        cost = self.scn.cost_keeping()
-        
-        self.period += 1
-        
-        if self.period < self.scn.max_period:
-            self.scn.before_action(self.period)
-        else:
-            self.terminal = True
-            
-            
-        states = self.scn.get_states(self.scn.player, self.period)
-#         states['period'] = self.period
-    
-        return states, cost, self.terminal 
 

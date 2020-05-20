@@ -1,3 +1,5 @@
+from abc import ABC, abstractmethod
+
 class Inventory_Policy(ABC):
     @abstractmethod
     def get_order_quantity(self, states):

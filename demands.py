@@ -1,0 +1,41 @@
+import numpy as np
+
+class DemandGenerator():
+    
+    def __init__(self, demands_pattern='classic_beer_game', size=None, low=None, high=None, mean=None, sd=None):
+        
+        # can be a string ('normal', 'uniform', 'classic_beer_game') or a list of numbers
+        self.demands_pattern = demands_pattern
+        self.size = size
+        self.low = low
+        self.high = high
+        self.mean = mean
+        self.sd = sd
+
+        
+        self.reset()
+        
+        
+    def reset(self):
+        
+        if self.demands_pattern == 'uniform':
+            if (self.low is None) or (self.high is None):
+                raise ValueError('"low" and "high" need to be provided when uniform pattern is specified')
+            self.demands = np.random.randint(self.low, self.high, self.size)
+            
+        elif self.demands_pattern == 'normal':
+            self.demands = (self.mean + self.sd * np.random.randn(self.size)).astype(int)
+            if (self.mean is None) or (self.sd is None):
+                raise ValueError('"mean" and "sd" need to be provided when normal pattern is specified')
+                
+        elif self.demands_pattern == 'classic_beer_game':
+            self.demands = np.array([4]*4 + [8]*31)
+            
+        elif isinstance(self.demands_pattern, list):
+            self.demands = self.demands_pattern
+        
+    def get_demand(self, period):
+        return self.demands[period].item()
+
+        
+        
