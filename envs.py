@@ -1,3 +1,4 @@
+import numpy as np
 from demands import DemandGenerator
 from policies import Base_Stock_Policy
 from supplychain import Node, Arc, Supply_chain_network
@@ -41,9 +42,12 @@ class InventoryManagementEnv():
         return states, cost, self.terminal
 
 
-def build_beer_game(player='wholesaler', demand_type='deterministic'):
-    if demand_type == 'deterministic':
+def build_beer_game(player='wholesaler', demand_type='classic_beer_game'):
+
+    if demand_type == 'classic_beer_game':
         demand_gen = DemandGenerator('classic_beer_game')
+    elif demand_type == 'deterministic_random':
+        demand_gen = DemandGenerator((8 + 2 * np.random.randn(35)).astype(int))
     else:
         demand_gen = DemandGenerator('normal', mean=8, sd=2, size=35)
 
