@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
-from typing import List
-
+import pandas as pd
+import numpy as np
 
 
 @dataclass
@@ -25,24 +25,20 @@ class Shipment:
     time_till_arrival: int
 
 
-
 class OrderList(list):
     
     @property
     def requires_shipment_subtotal(self):
         return sum([so.unshipped_quantity for so in self if so.time_till_received == 0])
     
-    
     def clean_finished_orders(self):
         self.sort(key=lambda x: x.unshipped_quantity, reverse=True)
         while (self.__len__() > 0) and (self[-1].unshipped_quantity == 0):
             self.pop()
     
-    
 
 class ShipmentList(list):
-    
-    
+
     def receive_shipments(self):
         
         arrived_quantity = 0
@@ -52,53 +48,46 @@ class ShipmentList(list):
             arrived_quantity += popped_shipment.quantity   
             
         return arrived_quantity
-    
-    
+
     @property
     def en_route_subtotal(self):
         return sum([sm.quantity for sm in self])
+
     
+class Node:
     
-    
-    
-    
-    
-class Node():
-    
-    def __init__(self, name, policy=None, demand_source=False, demands=None, supply_source = False, initial_inventory=12, holding_cost=0.5, stockout_cost=1.0, initial_previous_orders=None):
+    def __init__(self, name, policy=None, demand_source=False, demands=None, supply_source=False,
+                 initial_inventory=12, holding_cost=0.5, stockout_cost=1.0, initial_previous_orders=None):
         
         self.name = name
         self.demands = demands
         self.policy = policy
         
-        self.demand_source = demand_source # 'demand node' with external demand
-        self.supply_source = supply_source # 'supplier node' with unlimited supply
+        self.demand_source = demand_source  # 'demand node' with external demand
+        self.supply_source = supply_source  # 'supplier node' with unlimited supply
         
         self.unit_holding_cost = holding_cost
         self.unit_stockout_cost = stockout_cost
         
-        self.initial_inventory =  9999999 if supply_source else initial_inventory
+        self.initial_inventory = 9999999 if supply_source else initial_inventory
         self.initial_previous_orders = initial_previous_orders
         
         self.reset()
-        
-        
 
     def __str__(self):
-        return 'Node({}: Inventory: {}, Unfilled Demand: {})'.format(self.name, self.current_inventory, self.unfilled_demand)
+        return 'Node({}: Inventory: {}, Unfilled Demand: {})'.format(
+            self.name, self.current_inventory, self.unfilled_demand)
     
     def __repr__(self):
         return self.__str__()
-    
-    
-        
+
+    # noinspection PyAttributeOutsideInit
     def reset(self):
         self.current_inventory = self.initial_inventory
         self.previous_orders = [] if self.initial_previous_orders is None else self.initial_previous_orders[:]
-            
         
         self.unfilled_demand = 0
-        
+
         self.current_stockout_cost = 0
         self.current_holding_cost = 0
         
@@ -111,10 +100,8 @@ class Node():
         if self.demand_source:
             self.demands.reset()
 
-    
     def place_order(self, states, arc, period, order_quantity=None):
-        
-        
+
         if self.demand_source:
             order_quantity = self.demands.get_demand(period)
             new_order = Order(order_quantity, 0, arc.information_leadtime)
@@ -125,56 +112,48 @@ class Node():
             if order_quantity is None:
                 order_quantity = self.policy.get_order_quantity(states)
 
-                
-
-                
-            # track order hisotry for reporting states
+            # track order history for reporting states
             self.previous_orders.pop()
             self.previous_orders.insert(0, order_quantity)
             
             new_order = Order(order_quantity, 0, arc.information_leadtime)
-            
-            
-#             if self.name == 'wholesaler':
-#                 print('placing order for wholeslaer:')
-#                 print(states)
-#                 print(new_order)
+
             arc.sales_orders.append(new_order)
             
         self.order_history.append(order_quantity)
         
 
-        
-        
-class Arc():
+class Arc:
     
-    def __init__(self, source, target, information_leadtime, shipment_leadtime, initial_shipments=None, initial_SOs=None):
+    def __init__(self, source, target, information_leadtime, shipment_leadtime,
+                 initial_shipments=None, initial_sales_orders=None):
         self.source = source
         self.target = target
         self.information_leadtime = information_leadtime
         
         self.shipment_leadtime = shipment_leadtime
         self.initial_shipments = initial_shipments
-        self.initial_SOs = initial_SOs
+        self.initial_SOs = initial_sales_orders
         
         self.reset()
-        
+
+    # noinspection PyAttributeOutsideInit
     def reset(self):
-        self.shipments = ShipmentList([] if self.initial_shipments is None else [Shipment(s[0], s[1]) for s in self.initial_shipments])
-        self.sales_orders = OrderList([] if self.initial_SOs is None else [Order(s[0], 0, s[2]) for s in self.initial_SOs])
-        
-        
+        self.shipments = ShipmentList(
+            [] if self.initial_shipments is None else [Shipment(s[0], s[1]) for s in self.initial_shipments])
+        self.sales_orders = OrderList(
+            [] if self.initial_SOs is None else [Order(s[0], 0, s[2]) for s in self.initial_SOs])
+
     def advance_order_slips(self):
         
         latest_demand = 0
         for so in self.sales_orders:
-            if  so.time_till_received > 0:
+            if so.time_till_received > 0:
                 if so.time_till_received == 1:
                     latest_demand += so.order_quantity
                 so.time_till_received -= 1
         return latest_demand
-    
-    
+
     def advance_shipments(self):
           
         # advance shipments        
@@ -184,9 +163,7 @@ class Arc():
         arrived_quantity = self.shipments.receive_shipments()
         
         return arrived_quantity
-    
-    
-                    
+
     def fill_orders(self, node):
         
         unfilled_quantity = 0
@@ -194,41 +171,32 @@ class Arc():
         for so in self.sales_orders: 
             if so.requires_shipping:
 
-                # quantity of the new shipment should be minimum between available invenotry and unshipped quantity
+                # quantity of the new shipment should be minimum between available inventory and unshipped quantity
                 quantity = min(node.current_inventory, so.unshipped_quantity)
                 if quantity > 0:
                     self.shipments.append(Shipment(quantity, self.shipment_leadtime))
                     so.shipped_quantity += quantity
 
-                if node.supply_source == False:
+                if not node.supply_source:
                     node.current_inventory -= quantity
                 
-                unfilled_quantity += (so.unshipped_quantity)
+                unfilled_quantity += so.unshipped_quantity
                 
         # clean up finished orders
         self.sales_orders.clean_finished_orders()
             
         return unfilled_quantity
-                    
-                    
+
     def __str__(self):
-        return 'arc(source:{}, target:{}, information leadtime:{}, shipment leadtime:{})'.format(self.source, self.target, self.information_leadtime,self.shipment_leadtime)
-    
-    
+        return 'arc(source:{}, target:{}, information leadtime:{}, shipment leadtime:{})'.format(
+            self.source, self.target, self.information_leadtime, self.shipment_leadtime)
+
     def __repr__(self):
         return self.__str__()
-    
-    
-    
-    
-    
-class Supply_chain_network():
 
-    '''
-    order of operations: receive shipments from supplier 
-                            -> ship products to customer 
-                            -> receive new sales orders
-    '''
+    
+class SupplyChainNetwork:
+
     def __init__(self, nodes, arcs, player):
         self.nodes = {node.name: node for node in nodes}
         self.arcs = {(arc.source, arc.target): arc for arc in arcs}
@@ -239,24 +207,23 @@ class Supply_chain_network():
         self.suppliers = {node.name: [arc.source for arc in arcs if arc.target == node.name] for node in nodes}
         self.customers = {node.name: [arc.target for arc in arcs if arc.source == node.name] for node in nodes}
 
+        self.internal_nodes = [node.name for node in nodes if (not node.supply_source) and (not node.demand_source)]
+
         self.shipment_sequence = self._parse_shipment_sequence()
         self.order_sequence = self._parse_order_sequence()
         
         self.player = player
         self.player_index = self.order_sequence.index(player)
 
-    
     def __str__(self):
         string = ''
         for arc in self.arcs:
             string += '{} -> {} \n'.format(self.arcs[arc].source, self.arcs[arc].target) 
         return string
-    
-    
+
     def __repr__(self):
         return self.__str__()
-    
-    
+
     def summary(self):
         
         for node in self.shipment_sequence:
@@ -276,16 +243,14 @@ class Supply_chain_network():
             print('\tShipments')
             for shipment in self.arcs[arc].shipments:
                 print('\t {}'.format(shipment))
-                
-                
+
     def reset(self):
         for node in self.nodes:
             self.nodes[node].reset()
             
         for arc in self.arcs:
             self.arcs[arc].reset()
-            
-    
+
     def _parse_shipment_sequence(self):
         
         shipped = []
@@ -301,15 +266,14 @@ class Supply_chain_network():
                     shipped.append(node)
 
         return shipped 
-            
-        
+
     def _parse_order_sequence(self):
         
         ordered = []
         not_ordered = [node for node in self.nodes]
         while len(not_ordered) > 0:
             for node in not_ordered:
-                ready= True
+                ready = True
                 for customer in self.customers[node]:
                     if customer not in ordered:
                         ready = False
@@ -318,8 +282,7 @@ class Supply_chain_network():
                     ordered.append(node)
                 
         return ordered
-    
-    
+
     def get_states(self, node, period):
         
         # Inventory
@@ -335,7 +298,6 @@ class Supply_chain_network():
             unfilled_demand = [arc.sales_orders.requires_shipment_subtotal for arc in downstream_arcs]
             unfilled_demand = sum(unfilled_demand)
 
-            
         # latest demand
         latest_demand = sum(self.nodes[node].latest_demand)
 
@@ -346,19 +308,25 @@ class Supply_chain_network():
         unshipped = sum([so.unshipped_quantity for arc in upstream_arcs for so in arc.sales_orders])
         en_route = sum([arc.shipments.en_route_subtotal for arc in upstream_arcs])
         on_order = unshipped + en_route
+
+        states_dict = {'inventory': inventory,
+                       'unfilled_demand': unfilled_demand,
+                       'latest_demand': latest_demand,
+                       'on_order': on_order}
         
-        
-        states_dict = {'inventory':inventory, 'unfilled_demand':unfilled_demand, 'latest_demand':latest_demand, 'on_order':on_order}
-        
-        previous_orders_dict = {'previous_order_{}'.format(i) : self.nodes[node].previous_orders[i] 
+        previous_orders_dict = {'previous_order_{}'.format(i): self.nodes[node].previous_orders[i]
                                 for i in range(len(self.nodes[node].previous_orders))}
 
         return {**states_dict, **previous_orders_dict}
 
-            
-            
+    """
+    Order of operations:
+        1. Advance order slips (from customers to suppliers)
+        2. Advance shipments (from suppliers to customers)
+        3. Place orders (from customers to suppliers)
+        4. Fulfill orders (from suppliers to customers)
+    """
     def before_action(self, period):
-        
          
         for node in self.order_sequence:
             self.nodes[node].latest_demand = []
@@ -369,61 +337,53 @@ class Supply_chain_network():
                 latest_demand = self.arcs[(supplier, node)].advance_order_slips()
                 self.nodes[supplier].latest_demand.append(latest_demand)
 
-    
         # advance shipments    
         for node in self.shipment_sequence:
             for customer in self.customers[node]:    
                 # Increase customer's inventory when the shipments arrive
                 arrived_quantity = self.arcs[(node, customer)].advance_shipments()
                 self.nodes[customer].current_inventory += arrived_quantity
-            
-                    
+
         # place new orders
         for node in self.order_sequence[:self.player_index]:
             for supplier in self.suppliers[node]:
-                arc = self.arcs[(supplier, node)] # TODO: need to send multiple arcs together in the multi-supplier setting
+                # TODO: need to send multiple arcs together in the multi-supplier setting
+                arc = self.arcs[(supplier, node)]
                 states = self.get_states(node, period)
                 self.nodes[node].place_order(states, arc, period)
-                
-                
-                
+
     def player_action(self, period, order_quantity):
         node = self.player
         for supplier in self.suppliers[node]:
-            
-            arc = self.arcs[(supplier, node)] # TODO: need to send multiple arcs together in the multi-supplier setting
+            # TODO: need to send multiple arcs together in the multi-supplier setting
+            arc = self.arcs[(supplier, node)]
             states = self.get_states(node, period)
             self.nodes[node].place_order(states, arc, period, order_quantity=order_quantity)
-            
-        
+
 #         self.summary()
-    
-                
         
     def after_action(self, period): 
         # place new orders
         for node in self.order_sequence[self.player_index+1:]:
             for supplier in self.suppliers[node]:
-                
-                arc = self.arcs[(supplier, node)] # TODO: need to send multiple arcs together in the multi-supplier setting
+                # TODO: need to send multiple arcs together in the multi-supplier setting
+                arc = self.arcs[(supplier, node)]
                 states = self.get_states(node, period)                
                 self.nodes[node].place_order(states, arc, period)
 
-                
-        # fill orders
+        # Fulfill orders
         for node in self.shipment_sequence:
             self.nodes[node].unfilled_demand = 0
             for customer in self.customers[node]:
                 self.nodes[node].unfilled_demand += self.arcs[(node, customer)].fill_orders(self.nodes[node])
-            
 
-                    
     def cost_keeping(self):
         
         c_h = 0
         c_s = 0
         
-        internal_nodes = [node for key, node in self.nodes.items() if (not node.supply_source) and (not node.demand_source)]
+        internal_nodes = [node for key, node in self.nodes.items() if
+                          (not node.supply_source) and (not node.demand_source)]
         for node in internal_nodes:
             
             # record holding cost
@@ -431,8 +391,7 @@ class Supply_chain_network():
             
             # record stockout cost
             node.current_stockout_cost = -node.unfilled_demand * node.unit_stockout_cost 
-            
-            
+
             # keep_cost_history
             node.holding_cost_history.append(node.current_holding_cost)
             node.stockout_cost_history.append(node.current_stockout_cost)
@@ -441,10 +400,28 @@ class Supply_chain_network():
             c_s += node.current_stockout_cost
             
         return c_h + c_s
-    
-    
 
-    
-    
+    def get_cost_history(self, nodes=None, as_df=False):
+        """
+        Get cost history of an node.
 
+        Args:
+            nodes: list or String. Names of the cost nodes. If not provided, will return cost history of all nodes.
+            as_df: Return cost history as pandas dataframe object.
+        """
 
+        if isinstance(nodes, str):
+            nodes = [nodes]
+        elif nodes is None:
+            nodes = self.internal_nodes
+
+        cost_dict = {node: {'holding_cost': self.nodes[node].holding_cost_history,
+                            'stockout_cost': self.nodes[node].stockout_cost_history} for node in nodes}
+
+        if as_df:
+            history_len = len(self.nodes[nodes[0]].holding_cost_history)
+            modified_dict = {key: {'node': key, 'period': np.arange(history_len), **item}
+                             for key, item in cost_dict.items()}
+            return pd.concat([pd.DataFrame().from_dict(item) for key, item in modified_dict.items()], ignore_index=True)
+        else:
+            return cost_dict
