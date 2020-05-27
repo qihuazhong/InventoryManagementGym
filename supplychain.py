@@ -407,7 +407,7 @@ class SupplyChainNetwork:
 
         Args:
             nodes: list or String. Names of the cost nodes. If not provided, will return cost history of all nodes.
-            as_df: Return cost history as pandas dataframe object.
+            as_df: Return cost history as pandas DataFrame object.
         """
 
         if isinstance(nodes, str):
