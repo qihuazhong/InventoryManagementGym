@@ -70,8 +70,7 @@ class Node:
         self.unit_stockout_cost = stockout_cost
         
         self.initial_inventory = 9999999 if supply_source else initial_inventory
-        self.initial_previous_orders = initial_previous_orders
-        
+
         self.reset()
 
     def __str__(self):
@@ -84,7 +83,6 @@ class Node:
     # noinspection PyAttributeOutsideInit
     def reset(self):
         self.current_inventory = self.initial_inventory
-        self.previous_orders = [] if self.initial_previous_orders is None else self.initial_previous_orders[:]
         
         self.unfilled_demand = 0
 
@@ -112,9 +110,7 @@ class Node:
             if order_quantity is None:
                 order_quantity = self.policy.get_order_quantity(states)
 
-            # track order history for reporting states
-            self.previous_orders.pop()
-            self.previous_orders.insert(0, order_quantity)
+            arc.keep_order_history(order_quantity)
             
             new_order = Order(order_quantity, 0, arc.information_leadtime)
 
@@ -124,9 +120,11 @@ class Node:
         
 
 class Arc:
+
+    HISTORY_LEN = 4
     
     def __init__(self, source, target, information_leadtime, shipment_leadtime,
-                 initial_shipments=None, initial_sales_orders=None):
+                 initial_shipments=None, initial_sales_orders=None,  initial_previous_orders=None):
         self.source = source
         self.target = target
         self.information_leadtime = information_leadtime
@@ -134,6 +132,8 @@ class Arc:
         self.shipment_leadtime = shipment_leadtime
         self.initial_shipments = initial_shipments
         self.initial_SOs = initial_sales_orders
+
+        self.initial_previous_orders = initial_previous_orders
         
         self.reset()
 
@@ -143,6 +143,14 @@ class Arc:
             [] if self.initial_shipments is None else [Shipment(s[0], s[1]) for s in self.initial_shipments])
         self.sales_orders = OrderList(
             [] if self.initial_SOs is None else [Order(s[0], 0, s[2]) for s in self.initial_SOs])
+
+        self.previous_orders = [] if self.initial_previous_orders is None else self.initial_previous_orders[:]
+
+    def keep_order_history(self, order_quantity):
+        # track order history for reporting states
+        if len(self.previous_orders) >= self.HISTORY_LEN:
+            self.previous_orders.pop()
+        self.previous_orders.insert(0, order_quantity)
 
     def advance_order_slips(self):
         
@@ -289,6 +297,7 @@ class SupplyChainNetwork:
         inventory = self.nodes[node].current_inventory
         
         # unfilled demand
+        # sales order quantities received but are waiting to be fulfilled
         if node in self.demand_sources:
             unfilled_demand = self.nodes[node].demands.get_demand(period)
         else:
@@ -302,6 +311,7 @@ class SupplyChainNetwork:
         latest_demand = sum(self.nodes[node].latest_demand)
 
         # on order quantity
+        # purchase order quantities that have been sent out but not delivered
         suppliers = self.suppliers[node]
         upstream_arcs = [self.arcs[(supplier, node)] for supplier in suppliers]
         
@@ -309,15 +319,18 @@ class SupplyChainNetwork:
         en_route = sum([arc.shipments.en_route_subtotal for arc in upstream_arcs])
         on_order = unshipped + en_route
 
-        states_dict = {'inventory': inventory,
-                       'unfilled_demand': unfilled_demand,
-                       'latest_demand': latest_demand,
-                       'on_order': on_order}
-        
-        previous_orders_dict = {'previous_order_{}'.format(i): self.nodes[node].previous_orders[i]
-                                for i in range(len(self.nodes[node].previous_orders))}
+        current_states_dict = {'inventory': inventory,
+                               'unfilled_demand': unfilled_demand,
+                               'latest_demand': latest_demand,
+                               'on_order': on_order}
 
-        return {**states_dict, **previous_orders_dict}
+        previous_orders_dict = {'previous_order_{}_{}'.format(arc.source, i): arc.previous_orders[i]
+                                for arc in upstream_arcs for i in range(len(arc.previous_orders))}
+        
+        # previous_orders_dict = {'previous_order_{}'.format(i): self.nodes[node].previous_orders[i]
+        #                         for i in range(len(self.nodes[node].previous_orders))}
+
+        return {**current_states_dict, **previous_orders_dict}
 
     """
     Order of operations:
