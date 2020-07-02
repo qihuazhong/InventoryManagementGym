@@ -1,7 +1,9 @@
+import random
 import numpy as np
 from collections import namedtuple
 
 Transition = namedtuple('Transition', ('state', 'action', 'next_state', 'reward'))
+
 
 class ReplayMemory(object):
 
@@ -41,8 +43,7 @@ class SumTree(object):
     - Changed updating operations to explicit sums to avoid float-point errors accumulation.
     - Use numpy vector operations for batch priority updates instead of for loops (about 8x faster when batch size is 128 and memory size is 2^17).
     - Use numpy vector operations for batch sampling instead of for loops (about 10x faster when batch size is 128 and memory size is 2^17)
-    
-    
+
     """
     
     def __init__(self, capacity):
@@ -52,10 +53,9 @@ class SumTree(object):
         
         # parent nodes = capacity - 1
         # leaf nodes = capacity
-        self.tree = np.zeros(2 * capacity -1)
+        self.tree = np.zeros(2 * capacity - 1)
         self.data = np.zeros(capacity, dtype=object)
-        
-        
+
     def push(self, priority, *experience):
         
         tree_index = self.position + self.capacity - 1
@@ -67,17 +67,15 @@ class SumTree(object):
         if self.position >= self.capacity:
             self.position = 0
             
-            
-            
     def update(self, tree_index, priority):
-        '''
-        The previoius implementations were prone to accumulating float-point operation errors.
-        The accumulated errors caused discrepencies between parents and their children's sums, therefore
+        """
+        The previous implementations were prone to accumulating float-point operation errors.
+        The accumulated errors caused discrepancies between parents and their children's sums, therefore
         a small probability of sampling from an unfilled position in the memory.
-        
-        Explicitly summing up the two children at each level instead of 
+
+        Explicitly summing up the two children at each level instead of
         adding the difference (obtained at the bottom level) solved the issue.
-        '''
+        """
 
         self.tree[tree_index] = priority
         
@@ -88,12 +86,9 @@ class SumTree(object):
             right_child_index = left_child_index + 1
             
             self.tree[tree_index] = self.tree[left_child_index] + self.tree[right_child_index]
-            
-            
-            
+
     def batch_update(self, tree_idx, ps):
 
-        
         self.tree[tree_idx] = ps
         
         tree_idx = np.array(tree_idx)
@@ -104,9 +99,7 @@ class SumTree(object):
             left_child_index = 2 * tree_idx + 1
             right_child_index = left_child_index + 1
             self.tree[tree_idx] = self.tree[left_child_index] + self.tree[right_child_index]
-            
-        
-        
+
     def get_leaf(self, v):
         
         parent_index = 0
@@ -129,10 +122,9 @@ class SumTree(object):
         data_index = leaf_index - self.capacity + 1
         
         return leaf_index, self.tree[leaf_index], self.data[data_index]
-    
-    
+
     def get_batch_leaves(self, values):
-        parent_index = np.zeros(shape = (len(values)), dtype=np.int32)
+        parent_index = np.zeros(shape=(len(values)), dtype=np.int32)
         
         while True:
             left_child_index = 2 * parent_index + 1
@@ -142,11 +134,10 @@ class SumTree(object):
             if (left_child_index >= len(self.tree)).all():
                 leaf_index = parent_index
                 break
-            else: # downward search, always search for a higher priority node
+            else:  # downward search, always search for a higher priority node
                 
                 left_mask = values <= self.tree[left_child_index]
                 right_mask = ~left_mask
-                
                 
                 parent_index[left_mask] = left_child_index[left_mask]
                 
@@ -173,8 +164,7 @@ class PERMemory(object):
     PER_b_increment_per_sampling = 0.0000005
     
     absolute_error_upper = 10000.  # clipped abs error
-    
-    
+
     def __init__(self, capacity):
         
         self.capacity = capacity
@@ -192,20 +182,18 @@ class PERMemory(object):
         
         if self.filled_length < self.capacity:
             self.filled_length += 1
-        
-        
+
     def sample_old(self, batch_size):
         
         self.PER_b = np.min([1., self.PER_b + self.PER_b_increment_per_sampling])
         
         # Create a sample array that will contains the minibatch
         memory_batch = []
-        batch_idx, batch_ISWeights = np.empty((batch_size,), dtype=np.int32), np.empty((batch_size), dtype=np.float32)
+        batch_idx, batch_ISWeights = np.empty((batch_size,), dtype=np.int32), np.empty(batch_size, dtype=np.float32)
     
         # Calculate the priority segment
         priority_segment = self.tree.total_priority / batch_size
-        
-        
+
         # Calculate the max weight
         p_min = np.min(self.tree.tree[-self.tree.capacity:]) / self.tree.total_priority
 
@@ -233,12 +221,10 @@ class PERMemory(object):
             memory_batch.append(experience)
             
         return batch_idx, memory_batch, batch_ISWeights
-    
-    
+
     def sample(self, batch_size):
         
         self.PER_b = np.min([1., self.PER_b + self.PER_b_increment_per_sampling])
-        
 
         p_min = np.min(self.tree.tree[-self.tree.capacity:-self.tree.capacity+self.filled_length-1]) / self.tree.total_priority
 
@@ -253,10 +239,7 @@ class PERMemory(object):
         batch_ISWeights = np.power(batch_size * sampling_probabilities, -self.PER_b)/max_weight
         
         return batch_idx, data.tolist(), batch_ISWeights.astype(np.float32)
-        
-        
 
-    
     def batch_update(self, tree_idx, abs_errors):
         abs_errors += self.PER_e
         clipped_errors = np.minimum(abs_errors, self.absolute_error_upper)
@@ -264,7 +247,6 @@ class PERMemory(object):
         ps = np.power(clipped_errors, self.PER_a).squeeze()
         
         self.tree.batch_update(tree_idx, ps)
-        
 
     def batch_update_old(self, tree_idx, abs_errors):
         abs_errors += self.PER_e
@@ -272,11 +254,8 @@ class PERMemory(object):
         
         ps = np.power(clipped_errors, self.PER_a)
 
-        
         for ti, p in zip(tree_idx, ps):
             self.tree.update(ti, p)
-        
-        
+
     def __len__(self):
         return self.filled_length
-    
