@@ -3,9 +3,17 @@ import numpy as np
 
 class DemandGenerator:
 
-    def __init__(self, demands_pattern='classic_beer_game', size=None, low=None, high=None, mean=None, sd=None):
-
-        # can be a string ('normal', 'uniform', 'classic_beer_game') or a list of numbers
+    def __init__(self, demands_pattern='classic_beer_game', size=None, low=None, high=None, 
+                 mean=None, sd=None):
+        """
+        Args:
+            demands_pattern: can be a string ('normal', 'uniform', 'classic_beer_game') to specify a stochastic demand
+                pattern or a list of numbers to specify deterministic demands.
+            low: must be provided when uniform pattern is specified
+            high: must be provided when uniform pattern is specified
+            mean: mean of a normal distribution, must be provided when normal pattern is specified
+            sd: standard deviation of a normal distribution, must be provided when normal pattern is specified
+        """
         self.demands_pattern = demands_pattern
         self.size = size
         self.low = low
