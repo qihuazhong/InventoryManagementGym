@@ -28,6 +28,9 @@ class InventoryManagementEnv:
             a tuple of stats (dict), cost (float) and terminal (bool)
         """
 
+        if self.terminal:
+            raise ValueError("Cannot take action when the state is terminal.")
+
         self.scn.player_action(self.period, quantity)
         self.scn.after_action(self.period)
 
