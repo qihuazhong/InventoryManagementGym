@@ -57,7 +57,7 @@ class ShipmentList(list):
 class Node:
     
     def __init__(self, name, policy=None, demand_source=False, demands=None, supply_source=False,
-                 initial_inventory=12, holding_cost=0.5, stockout_cost=1.0, initial_previous_orders=None):
+                 initial_inventory=0, holding_cost=0.5, stockout_cost=1.0, initial_previous_orders=None):
         
         self.name = name
         self.demands = demands
@@ -233,14 +233,16 @@ class SupplyChainNetwork:
         return self.__str__()
 
     def summary(self):
-        
+
+        print('='*10, 'nodes:', '='*10,)
         for node in self.shipment_sequence:
             print('Node: {}'.format(node))
             print('\tInventory: {}'.format(self.nodes[node].current_inventory))
             print('\tUnfilled Demand: {}'.format(self.nodes[node].unfilled_demand))
             print('\tCurrent Stockout Cost: {}'.format(self.nodes[node].current_stockout_cost))
             print('\tCurrent Holding Cost: {}'.format(self.nodes[node].current_holding_cost))
-        
+
+        print('=' * 10, 'arcs:', '=' * 10, )
         for arc in self.arcs.keys():
             print('{} -> {}'.format(self.arcs[arc].source, self.arcs[arc].target))
             

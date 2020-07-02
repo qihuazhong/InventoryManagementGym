@@ -23,6 +23,10 @@ class InventoryManagementEnv:
         return states
 
     def step(self, quantity, verbose=True):
+        """
+        return:
+            a tuple of stats (dict), cost (float) and terminal (bool)
+        """
 
         self.scn.player_action(self.period, quantity)
         self.scn.after_action(self.period)
@@ -54,10 +58,10 @@ def build_beer_game(player='wholesaler', demand_type='classic_beer_game', max_pe
     bs_24 = BaseStockPolicy(24)
 
     demand_source = Node(name='demand_source', demand_source=True, demands=demand_generator)
-    retailer = Node(name='retailer', policy=bs_32)
-    wholesaler = Node(name='wholesaler', policy=bs_32)
-    distributor = Node(name='distributor', policy=bs_32)
-    manufacturer = Node(name='manufacturer', policy=bs_24)
+    retailer = Node(name='retailer', initial_inventory=12, policy=bs_32)
+    wholesaler = Node(name='wholesaler', initial_inventory=12, policy=bs_32)
+    distributor = Node(name='distributor', initial_inventory=12, policy=bs_32)
+    manufacturer = Node(name='manufacturer', initial_inventory=12, policy=bs_24)
     supply_source = Node(name='supply_source', supply_source=True)
     nodes = [demand_source, retailer, wholesaler, distributor, manufacturer, supply_source]
 
