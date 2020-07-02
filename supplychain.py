@@ -57,7 +57,7 @@ class ShipmentList(list):
 class Node:
     
     def __init__(self, name, policy=None, demand_source=False, demands=None, supply_source=False,
-                 initial_inventory=0, holding_cost=0.5, stockout_cost=1.0, initial_previous_orders=None):
+                 initial_inventory=0, holding_cost=0.5, stockout_cost=1.0):
         
         self.name = name
         self.demands = demands
@@ -146,6 +146,9 @@ class Arc:
 
         self.previous_orders = [] if self.initial_previous_orders is None else self.initial_previous_orders[:]
 
+    def set_initial_sales_orders(self):
+        pass
+
     def keep_order_history(self, order_quantity):
         # track order history for reporting states
         if len(self.previous_orders) >= self.HISTORY_LEN:
@@ -153,7 +156,7 @@ class Arc:
         self.previous_orders.insert(0, order_quantity)
 
     def advance_order_slips(self):
-        
+
         latest_demand = 0
         for so in self.sales_orders:
             if so.time_till_received > 0:
@@ -162,15 +165,19 @@ class Arc:
                 so.time_till_received -= 1
         return latest_demand
 
-    def advance_shipments(self):
+    def advance_and_receive_shipments(self):
           
         # advance shipments        
         for shipment in self.shipments:
             shipment.time_till_arrival -= 1
-    
+
+        # receive shipments
         arrived_quantity = self.shipments.receive_shipments()
-        
         return arrived_quantity
+
+    # def receive_shipments(self):
+    #     arrived_quantity = self.shipments.receive_shipments()
+    #     return arrived_quantity
 
     def fill_orders(self, node):
         
@@ -356,7 +363,7 @@ class SupplyChainNetwork:
         for node in self.shipment_sequence:
             for customer in self.customers[node]:    
                 # Increase customer's inventory when the shipments arrive
-                arrived_quantity = self.arcs[(node, customer)].advance_shipments()
+                arrived_quantity = self.arcs[(node, customer)].advance_and_receive_shipments()
                 self.nodes[customer].current_inventory += arrived_quantity
 
         # place new orders
@@ -374,7 +381,6 @@ class SupplyChainNetwork:
             arc = self.arcs[(supplier, node)]
             states = self.get_states(node, period)
             self.nodes[node].place_order(states, arc, period, order_quantity=order_quantity)
-
 #         self.summary()
         
     def after_action(self, period): 
