@@ -1,14 +1,29 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass
+from .demands import DemandGenerator
 import pandas as pd
 import numpy as np
 
 
-@dataclass
 class Order:
-    order_quantity: float
-    shipped_quantity: float = 0.
-    time_till_received: int = 0
-        
+
+    def __init__(self, order_quantity, shipped_quantity: float = 0, time_till_received: int = 0):
+        if isinstance(order_quantity, float) or isinstance(order_quantity, int):
+            self.order_quantity = order_quantity
+        elif isinstance(order_quantity, DemandGenerator):
+            self.order_quantity = order_quantity.get_demand()
+        else:
+            raise TypeError("order_quantity must be an instance of float, int or DemandGenerator")
+
+        self.shipped_quantity = shipped_quantity
+        self.time_till_received = time_till_received
+
+    def __str__(self):
+        return 'Order(order_quantity: {}, shipped_quantity: {}, time_till_received: {})'.format(
+            self.order_quantity, self.shipped_quantity, self.time_till_received)
+
+    def __repr__(self):
+        return self.__str__()
+
     @property
     def unshipped_quantity(self):
         return self.order_quantity - self.shipped_quantity
@@ -121,7 +136,7 @@ class Node:
 
 class Arc:
 
-    HISTORY_LEN = 4
+    HISTORY_LEN = 4  # TODO
     
     def __init__(self, source, target, information_leadtime, shipment_leadtime,
                  initial_shipments=None, initial_sales_orders=None,  initial_previous_orders=None):
@@ -142,12 +157,10 @@ class Arc:
         self.shipments = ShipmentList(
             [] if self.initial_shipments is None else [Shipment(s[0], s[1]) for s in self.initial_shipments])
         self.sales_orders = OrderList(
-            [] if self.initial_SOs is None else [Order(s[0], 0, s[2]) for s in self.initial_SOs])
+            # [] if self.initial_SOs is None else [Order(so[0], so[1], so[2]) for so in self.initial_SOs])
+            [] if self.initial_SOs is None else [Order(*so) for so in self.initial_SOs])
 
         self.previous_orders = [] if self.initial_previous_orders is None else self.initial_previous_orders[:]
-
-    def set_initial_sales_orders(self):
-        pass
 
     def keep_order_history(self, order_quantity):
         # track order history for reporting states
@@ -175,9 +188,9 @@ class Arc:
         arrived_quantity = self.shipments.receive_shipments()
         return arrived_quantity
 
-    # def receive_shipments(self):
-    #     arrived_quantity = self.shipments.receive_shipments()
-    #     return arrived_quantity
+    def receive_shipments(self):
+        arrived_quantity = self.shipments.receive_shipments()
+        return arrived_quantity
 
     def fill_orders(self, node):
         
@@ -212,7 +225,7 @@ class Arc:
     
 class SupplyChainNetwork:
 
-    def __init__(self, nodes, arcs, player):
+    def __init__(self, nodes, arcs, player, max_period=100):
         self.nodes = {node.name: node for node in nodes}
         self.arcs = {(arc.source, arc.target): arc for arc in arcs}
         
@@ -229,6 +242,8 @@ class SupplyChainNetwork:
         
         self.player = player
         self.player_index = self.order_sequence.index(player)
+
+        self.max_period = max_period
 
     def __str__(self):
         string = ''
@@ -367,12 +382,13 @@ class SupplyChainNetwork:
                 self.nodes[customer].current_inventory += arrived_quantity
 
         # place new orders
-        for node in self.order_sequence[:self.player_index]:
-            for supplier in self.suppliers[node]:
-                # TODO: need to send multiple arcs together in the multi-supplier setting
-                arc = self.arcs[(supplier, node)]
-                states = self.get_states(node, period)
-                self.nodes[node].place_order(states, arc, period)
+        if period < self.max_period:
+            for node in self.order_sequence[:self.player_index]:
+                for supplier in self.suppliers[node]:
+                    # TODO: need to send multiple arcs together in the multi-supplier setting
+                    arc = self.arcs[(supplier, node)]
+                    states = self.get_states(node, period)
+                    self.nodes[node].place_order(states, arc, period)
 
     def player_action(self, period, order_quantity):
         node = self.player
@@ -394,6 +410,12 @@ class SupplyChainNetwork:
 
         # Fulfill orders
         for node in self.shipment_sequence:
+
+            # Update Inventory (receive shipments) first
+            for supplier in self.suppliers[node]:
+                arrived_quantity = self.arcs[(supplier, node)].receive_shipments()
+                self.nodes[node].current_inventory += arrived_quantity
+
             self.nodes[node].unfilled_demand = 0
             for customer in self.customers[node]:
                 self.nodes[node].unfilled_demand += self.arcs[(node, customer)].fill_orders(self.nodes[node])

@@ -1,7 +1,7 @@
 import numpy as np
-from demands import DemandGenerator
-from policies import BaseStockPolicy
-from supplychain import Node, Arc, SupplyChainNetwork
+from .demands import DemandGenerator
+from .policies import BaseStockPolicy
+from .supplychain import Node, Arc, SupplyChainNetwork
 
 
 class InventoryManagementEnv:
@@ -38,9 +38,8 @@ class InventoryManagementEnv:
 
         self.period += 1
 
-        if self.period < self.scn.max_period:
-            self.scn.before_action(self.period)
-        else:
+        self.scn.before_action(self.period)
+        if self.period >= self.scn.max_period:
             self.terminal = True
 
         states = self.scn.get_states(self.scn.player, self.period)
@@ -78,8 +77,7 @@ def build_beer_game(player='wholesaler', demand_type='classic_beer_game', max_pe
                 initial_sales_orders=[(4, 0, 1), (4, 0, 2)], initial_previous_orders=[4, 4, 4, 4]),
             Arc('retailer', 'demand_source', 0, 0)]
 
-    scn = SupplyChainNetwork(nodes=nodes, arcs=arcs, player=player)
-    scn.max_period = max_period
+    scn = SupplyChainNetwork(nodes=nodes, arcs=arcs, player=player, max_period=max_period)
 
     return InventoryManagementEnv(scn)
 
@@ -97,15 +95,17 @@ def build_newsvendor(c=1, p=4, mu=100, sigma=30):
     """
 
     demand_generator = DemandGenerator(demands_pattern='normal', mean=mu, sd=sigma, size=1)
+    zero_demand = DemandGenerator(demands_pattern=np.array([0], dtype=int))
 
-    demand_source = Node(name='demand_source', demand_source=True, demands=demand_generator)
+    demand_source = Node(name='demand_source', demand_source=True, demands=zero_demand)
     newsvendor = Node(name='newsvendor', holding_cost=c, stockout_cost=p-c)
     supply_source = Node(name='supply_source', supply_source=True)
     nodes = [demand_source, newsvendor, supply_source]
 
     arcs = [Arc(source='supply_source', target='newsvendor', information_leadtime=0, shipment_leadtime=0),
-            Arc(source='newsvendor', target='demand_source', information_leadtime=0, shipment_leadtime=0)]
+            Arc(source='newsvendor', target='demand_source', information_leadtime=0, shipment_leadtime=0,
+                initial_sales_orders=[(demand_generator,)])]
 
-    scn = SupplyChainNetwork(nodes=nodes, arcs=arcs, player='newsvendor')
-    scn.max_period = 1
+    scn = SupplyChainNetwork(nodes=nodes, arcs=arcs, player='newsvendor', max_period=1)
+
     return InventoryManagementEnv(scn)

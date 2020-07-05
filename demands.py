@@ -42,5 +42,5 @@ class DemandGenerator:
         else:
             raise ValueError("Demand pattern not recognized")
 
-    def get_demand(self, period):
+    def get_demand(self, period=0):
         return self.demands[period].item()
