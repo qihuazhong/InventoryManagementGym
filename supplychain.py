@@ -343,18 +343,17 @@ class SupplyChainNetwork:
         en_route = sum([arc.shipments.en_route_subtotal for arc in upstream_arcs])
         on_order = unshipped + en_route
 
-        current_states_dict = {'inventory': inventory,
-                               'unfilled_demand': unfilled_demand,
-                               'latest_demand': latest_demand,
-                               'on_order': on_order}
+        states_dict = {'inventory': inventory,
+                       'unfilled_demand': unfilled_demand,
+                       'latest_demand': latest_demand,
+                       'on_order': on_order}
 
         previous_orders_dict = {'previous_order_{}_{}'.format(arc.source, i): arc.previous_orders[i]
                                 for arc in upstream_arcs for i in range(len(arc.previous_orders))}
-        
-        # previous_orders_dict = {'previous_order_{}'.format(i): self.nodes[node].previous_orders[i]
-        #                         for i in range(len(self.nodes[node].previous_orders))}
 
-        return {**current_states_dict, **previous_orders_dict}
+        states_dict = {**states_dict, **previous_orders_dict}
+
+        return states_dict
 
     """
     Order of operations:

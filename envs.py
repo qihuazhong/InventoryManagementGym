@@ -107,5 +107,6 @@ def build_newsvendor(c=1, p=4, mu=100, sigma=30):
                 initial_sales_orders=[(demand_generator,)])]
 
     scn = SupplyChainNetwork(nodes=nodes, arcs=arcs, player='newsvendor', max_period=1)
+    scn.visible_states = ['inventory']
 
     return InventoryManagementEnv(scn)
