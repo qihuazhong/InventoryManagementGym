@@ -6,8 +6,17 @@ from .supplychain import Node, Arc, SupplyChainNetwork
 
 class InventoryManagementEnv:
 
-    def __init__(self, supply_chain_network):
+    def __init__(self, supply_chain_network, visible_states=None, return_dict=False):
+        """
+        Args:
+            supply_chain_network:
+            visible_states: A string or a list of strings. Limit the states that are visible to the agent. Return
+            all states when not provided.
+            return_dict: whether the return states is a numpy array(Default) or a dictionary
+        """
         self.scn = supply_chain_network
+        self.visible_states = visible_states
+        self.return_dict = return_dict
         self.terminal = False
 
     def reset(self):
@@ -18,11 +27,14 @@ class InventoryManagementEnv:
         self.scn.before_action(self.period)
 
         states = self.scn.get_states(self.scn.player, self.period)
-        states['period'] = self.period
+        states['period'] = self.scn.max_period - self.period
 
+        if not self.return_dict:
+            states = np.array(list(states.values()))
         return states
 
-    def step(self, quantity, verbose=True):
+
+    def step(self, quantity):
         """
         return:
             a tuple of stats (dict), cost (float) and terminal (bool)
@@ -43,7 +55,13 @@ class InventoryManagementEnv:
             self.terminal = True
 
         states = self.scn.get_states(self.scn.player, self.period)
-        states['period'] = self.period
+        states['period'] = self.scn.max_period - self.period
+
+        # if self.visible_states is not None:
+
+        if not self.return_dict:
+            states = np.array(list(states.values()))
+        return states
 
         return states, cost, self.terminal
 
