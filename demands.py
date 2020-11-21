@@ -33,12 +33,16 @@ class DemandGenerator:
             self.demands = np.random.randint(self.low, self.high+1, self.size)
 
         elif self.demands_pattern == 'normal':
-            self.demands = np.maximum(self.mean + self.sd * np.random.randn(self.size), 0).astype(int)
+            self.demands = np.round(np.maximum(self.mean + self.sd * np.random.randn(self.size), 0)).astype(int)
             if (self.mean is None) or (self.sd is None):
                 raise ValueError('"mean" and "sd" need to be provided when normal pattern is specified')
 
         elif self.demands_pattern == 'classic_beer_game':
             self.demands = np.array([4] * 4 + [8] * (self.size - 4))
+
+        elif self.demands_pattern == 'uniform_50':
+            self.demands = np.array([2,6,6,1,3,1,0,8,0,6,6,3,0,8,0,1,2,5,8,2,6,2,4,4,8,
+                                     1,0,6,4,2,2,7,7,4,7,7,2,2,5,0,3,4,6,1,1,5,2,0,0,7])
 
         else:
             raise ValueError("Demand pattern not recognized")
